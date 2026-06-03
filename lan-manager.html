@@ -139,7 +139,7 @@
       <strong style="color:var(--text)">NetVault</strong> folder on your OneDrive —
       synced automatically across all devices.
     </div>
-    <button class="btn-ms" onclick="signIn()">
+    <button class="btn-ms" id="signin-btn" onclick="signIn()" disabled style="opacity:.5;cursor:not-allowed">
       <svg width="20" height="20" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
       SIGN IN WITH MICROSOFT
     </button>
@@ -272,6 +272,9 @@ async function signOut(){
 
 async function handleStartup(){
   await msalInstance.initialize();
+  // MSAL is ready — enable the sign-in button
+  const btn = document.getElementById('signin-btn');
+  if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; }
   try{ await msalInstance.handleRedirectPromise(); }catch{}
   const accs = msalInstance.getAllAccounts();
   if(accs.length>0){ currentAccount=accs[0]; showLoading('Loading your data...'); await initApp(); }
