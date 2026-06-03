@@ -74,6 +74,21 @@ window.__msalReady = window.__msalReady || false;
   .filter-select{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:.7rem 1rem;font-family:var(--mono);font-size:.82rem;outline:none;cursor:pointer;min-width:150px}
   .btn-add{background:var(--accent);color:var(--bg);border:none;padding:.7rem 1.5rem;font-family:var(--sans);font-weight:700;font-size:.85rem;cursor:pointer;transition:all .2s;white-space:nowrap;letter-spacing:.04em}
   .btn-add:hover{background:#33eaff;box-shadow:0 4px 20px rgba(0,229,255,.3)}
+  .btn-import{background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.4);padding:.7rem 1.25rem;font-family:var(--sans);font-weight:700;font-size:.85rem;cursor:pointer;transition:all .2s;white-space:nowrap;letter-spacing:.04em}
+  .btn-import:hover{background:rgba(124,58,237,.3);box-shadow:0 4px 20px rgba(124,58,237,.2)}
+  .btn-export{background:rgba(16,185,129,.1);color:var(--success);border:1px solid rgba(16,185,129,.3);padding:.7rem 1.25rem;font-family:var(--sans);font-weight:700;font-size:.85rem;cursor:pointer;transition:all .2s;white-space:nowrap;letter-spacing:.04em}
+  .btn-export:hover{background:rgba(16,185,129,.2)}
+  .import-modal{max-width:620px}
+  .template-row{display:flex;gap:.75rem;margin-top:1rem}
+  .btn-template{background:none;border:1px solid var(--border);color:var(--muted);padding:.6rem 1rem;font-family:var(--mono);font-size:.75rem;cursor:pointer;transition:all .2s;letter-spacing:.04em;flex:1;text-align:center}
+  .btn-template:hover{border-color:var(--accent);color:var(--accent)}
+  .preview-table-wrap{max-height:260px;overflow-y:auto;margin-top:1rem;border:1px solid var(--border)}
+  .preview-table-wrap table{width:100%;border-collapse:collapse;font-size:.75rem}
+  .preview-table-wrap th{background:var(--surface2);padding:.5rem .75rem;font-family:var(--mono);font-size:.65rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;position:sticky;top:0}
+  .preview-table-wrap td{padding:.5rem .75rem;border-bottom:1px solid rgba(30,45,69,.5);font-family:var(--mono)}
+  .row-ok{color:var(--success)}.row-err{color:var(--danger)}.row-warn{color:var(--warning)}
+  .import-summary{font-family:var(--mono);font-size:.78rem;margin-top:.75rem;padding:.75rem 1rem;background:var(--surface2);border:1px solid var(--border)}
+  .import-summary span{margin-right:1.5rem}
 
   .table-wrap{background:var(--surface);border:1px solid var(--border);overflow-x:auto;animation:slideUp .4s ease .25s both}
   table{width:100%;border-collapse:collapse}
@@ -182,6 +197,9 @@ window.__msalReady = window.__msalReady || false;
       <select class="filter-select" id="filter-branch" onchange="renderTable()"><option value="">All Branches</option></select>
       <select class="filter-select" id="filter-type" onchange="renderTable()"><option value="">All Device Types</option></select>
       <button class="btn-add" onclick="openModal()">+ ADD DEVICE</button>
+      <button class="btn-import" onclick="document.getElementById('csv-file-input').click()">⬆ IMPORT CSV/XLSX</button>
+      <button class="btn-export" onclick="exportCSV()">⬇ EXPORT CSV</button>
+      <input type="file" id="csv-file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleImport(event)">
     </div>
     <div class="table-wrap">
       <table>
@@ -230,6 +248,52 @@ window.__msalReady = window.__msalReady || false;
     <div class="confirm-actions">
       <button class="btn-cancel" onclick="closeConfirm()">CANCEL</button>
       <button class="btn-confirm-del" onclick="confirmDelete()">DELETE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Preview Modal -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal import-modal">
+    <h2>Import Devices</h2>
+    <div class="modal-sub" id="import-modal-sub">// PREVIEW & CONFIRM IMPORT</div>
+
+    <div class="import-summary" id="import-summary" style="display:none">
+      <span id="imp-ok" class="row-ok"></span>
+      <span id="imp-warn" class="row-warn"></span>
+      <span id="imp-err" class="row-err"></span>
+    </div>
+
+    <div class="preview-table-wrap" id="preview-wrap" style="display:none">
+      <table>
+        <thead><tr>
+          <th>Status</th><th>IP</th><th>Device</th><th>Type</th><th>MAC</th><th>Branch</th><th>User</th><th>Notes</th>
+        </tr></thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:1rem">
+      <div style="font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-bottom:.5rem;letter-spacing:.06em">// EXPECTED COLUMNS (order doesn't matter, headers required):</div>
+      <div style="font-family:var(--mono);font-size:.75rem;color:var(--text);background:var(--surface2);padding:.75rem 1rem;border:1px solid var(--border);line-height:1.8">
+        <span style="color:var(--accent)">ip</span> &nbsp;·&nbsp;
+        <span style="color:var(--accent)">device</span> &nbsp;·&nbsp;
+        <span style="color:var(--accent)">type</span> &nbsp;·&nbsp;
+        <span style="color:var(--accent)">mac</span> &nbsp;·&nbsp;
+        <span style="color:var(--accent)">branch</span> &nbsp;·&nbsp;
+        <span style="color:var(--muted)">user (optional)</span> &nbsp;·&nbsp;
+        <span style="color:var(--muted)">notes (optional)</span>
+      </div>
+      <div class="template-row">
+        <button class="btn-template" onclick="downloadTemplate('csv')">⬇ Download CSV Template</button>
+        <button class="btn-template" onclick="downloadTemplate('xlsx')">⬇ Download XLSX Template</button>
+      </div>
+    </div>
+
+    <div id="import-error" style="font-family:var(--mono);font-size:.75rem;color:var(--danger);margin-top:.75rem;display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeImportModal()">CANCEL</button>
+      <button class="btn-save" id="btn-confirm-import" onclick="confirmImport()" style="display:none">IMPORT VALID ROWS</button>
     </div>
   </div>
 </div>
@@ -522,6 +586,208 @@ function getSeedData(){
     {id:uid(),ip:'192.168.3.1',device:'ROUTER-GS-01',type:'Router',mac:'E8:4E:06:77:88:99',branch:'Branch — Gros Islet',user:'IT Dept',notes:'Site router',added:Date.now()},
     {id:uid(),ip:'192.168.3.5',device:'AP-GS-FLOOR1',type:'Access Point',mac:'70:3A:CB:AA:BB:CC',branch:'Branch — Gros Islet',user:'',notes:'Floor 1 Wi-Fi',added:Date.now()},
   ];
+}
+
+// ═══════════════════════════════════════════════════════════
+//  IMPORT / EXPORT
+// ═══════════════════════════════════════════════════════════
+const VALID_TYPES=['Router','Switch','Server','Workstation','Printer','IP Camera','Access Point','Firewall','NAS','VoIP Phone','Other'];
+const IP_RE=/^(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+const MAC_RE=/^([0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}$/;
+
+let importRows=[];
+
+function normalizeHeader(h){
+  return h.trim().toLowerCase().replace(/[\s_\-]+/g,'');
+}
+
+function parseCSVLine(line){
+  const res=[]; let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ; }
+    else if(c===','&&!inQ){res.push(cur);cur='';}
+    else cur+=c;
+  }
+  res.push(cur);
+  return res.map(s=>s.trim());
+}
+
+function parseCSV(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2) return {headers:[],rows:[]};
+  const headers=parseCSVLine(lines[0]).map(normalizeHeader);
+  const rows=lines.slice(1).map(l=>parseCSVLine(l));
+  return {headers,rows};
+}
+
+async function parseXLSX(buffer){
+  // Minimal XLSX parser — reads first sheet, extracts rows as arrays
+  // We'll use a lightweight approach: convert to CSV via SheetJS loaded from CDN
+  return new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src='https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+    script.onload=()=>{
+      try{
+        const wb=XLSX.read(buffer,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const csv=XLSX.utils.sheet_to_csv(ws);
+        resolve(parseCSV(csv));
+      }catch(e){reject(e);}
+    };
+    script.onerror=()=>reject(new Error('SheetJS failed to load'));
+    document.head.appendChild(script);
+  });
+}
+
+function validateRow(obj, rowNum){
+  const errors=[], warnings=[];
+  const ip=(obj.ip||'').trim();
+  const device=(obj.device||'').trim();
+  const type=(obj.type||'').trim();
+  const mac=(obj.mac||'').trim().toUpperCase().replace(/-/g,':');
+  const branch=(obj.branch||'').trim();
+
+  if(!ip) errors.push('IP missing');
+  else if(!IP_RE.test(ip)) errors.push(`Invalid IP: ${ip}`);
+
+  if(!device) errors.push('Device name missing');
+  if(!branch) errors.push('Branch missing');
+
+  if(!mac) errors.push('MAC missing');
+  else if(!MAC_RE.test(obj.mac.trim())) errors.push(`Invalid MAC: ${mac}`);
+
+  if(!type) warnings.push('Type missing — will use "Other"');
+  else if(!VALID_TYPES.includes(type)) warnings.push(`Unknown type "${type}" — will use "Other"`);
+
+  // Check duplicate IP in existing devices
+  const dupExisting=devices.find(d=>d.ip===ip);
+  if(dupExisting) warnings.push(`IP ${ip} already exists (will overwrite)`);
+
+  return {errors,warnings,ip,device,type:type||'Other',mac,branch,user:(obj.user||'').trim(),notes:(obj.notes||'').trim()};
+}
+
+async function handleImport(event){
+  const file=event.target.files[0];
+  event.target.value=''; // reset so same file can be re-selected
+  if(!file) return;
+
+  let parsed;
+  try{
+    if(file.name.endsWith('.csv')){
+      const text=await file.text();
+      parsed=parseCSV(text);
+    } else {
+      const buffer=await file.arrayBuffer();
+      parsed=await parseXLSX(new Uint8Array(buffer));
+    }
+  }catch(e){
+    showToast('Failed to read file: '+e.message,'error'); return;
+  }
+
+  const {headers,rows}=parsed;
+  if(!headers.length){showToast('File appears empty','error');return;}
+
+  // Map headers
+  const colMap={};
+  const aliases={ip:['ip','ipaddress'],device:['device','devicename','name','hostname'],
+    type:['type','devicetype'],mac:['mac','macaddress','macaddr'],
+    branch:['branch','branchlocation','location','site'],
+    user:['user','assigneduser','username'],notes:['notes','note','description']};
+  headers.forEach((h,i)=>{
+    for(const[field,alts]of Object.entries(aliases)){
+      if(alts.includes(h)) colMap[field]=i;
+    }
+  });
+
+  const requiredFields=['ip','device','mac','branch'];
+  const missing=requiredFields.filter(f=>colMap[f]===undefined);
+  if(missing.length){
+    document.getElementById('import-error').textContent=`⚠ Missing required columns: ${missing.join(', ')}`;
+    document.getElementById('import-error').style.display='block';
+    document.getElementById('import-modal').classList.add('open');
+    document.getElementById('preview-wrap').style.display='none';
+    document.getElementById('import-summary').style.display='none';
+    document.getElementById('btn-confirm-import').style.display='none';
+    return;
+  }
+
+  // Build row objects
+  importRows=rows.filter(r=>r.some(c=>c.trim())).map((r,i)=>{
+    const obj={};
+    for(const[field,idx]of Object.entries(colMap)) obj[field]=(r[idx]||'').trim();
+    return {rowNum:i+2,...validateRow(obj,i+2)};
+  });
+
+  // Render preview
+  const okRows=importRows.filter(r=>r.errors.length===0);
+  const errRows=importRows.filter(r=>r.errors.length>0);
+  const warnRows=importRows.filter(r=>r.errors.length===0&&r.warnings.length>0);
+
+  document.getElementById('imp-ok').textContent=`✓ ${okRows.length} valid`;
+  document.getElementById('imp-warn').textContent=warnRows.length?`⚠ ${warnRows.length} warnings`:'';
+  document.getElementById('imp-err').textContent=errRows.length?`✗ ${errRows.length} errors`:'';
+  document.getElementById('import-summary').style.display='block';
+
+  document.getElementById('preview-body').innerHTML=importRows.map(r=>{
+    const cls=r.errors.length?'row-err':r.warnings.length?'row-warn':'row-ok';
+    const status=r.errors.length?'✗ '+r.errors.join(', '):r.warnings.length?'⚠ '+r.warnings.join(', '):'✓ OK';
+    return `<tr class="${cls}"><td>${status}</td><td>${esc(r.ip)}</td><td>${esc(r.device)}</td><td>${esc(r.type)}</td><td>${esc(r.mac)}</td><td>${esc(r.branch)}</td><td>${esc(r.user)}</td><td>${esc(r.notes)}</td></tr>`;
+  }).join('');
+
+  document.getElementById('preview-wrap').style.display='block';
+  document.getElementById('import-error').style.display='none';
+  document.getElementById('import-modal-sub').textContent=`// ${importRows.length} ROWS FOUND — REVIEW BEFORE IMPORTING`;
+  document.getElementById('btn-confirm-import').style.display=okRows.length?'':'none';
+  document.getElementById('btn-confirm-import').textContent=`IMPORT ${okRows.length} VALID ROW${okRows.length!==1?'S':''}`;
+  document.getElementById('import-modal').classList.add('open');
+}
+
+async function confirmImport(){
+  const validRows=importRows.filter(r=>r.errors.length===0);
+  let added=0, updated=0;
+  for(const r of validRows){
+    const mac=r.mac.toUpperCase().replace(/-/g,':');
+    const existing=devices.findIndex(d=>d.ip===r.ip);
+    if(existing>=0){
+      devices[existing]={...devices[existing],ip:r.ip,device:r.device,type:r.type,mac,branch:r.branch,user:r.user,notes:r.notes};
+      updated++;
+    } else {
+      devices.push({id:uid(),ip:r.ip,device:r.device,type:r.type,mac,branch:r.branch,user:r.user,notes:r.notes,added:Date.now()});
+      added++;
+    }
+  }
+  closeImportModal();
+  renderTable();
+  await persistDevices();
+  showToast(`Import complete: ${added} added, ${updated} updated`);
+}
+
+function closeImportModal(){
+  document.getElementById('import-modal').classList.remove('open');
+  importRows=[];
+}
+
+// ── Export CSV ────────────────────────────────────────────
+function exportCSV(){
+  const headers=['ip','device','type','mac','branch','user','notes'];
+  const rows=devices.map(d=>headers.map(h=>{ const v=String(d[h]||''); return v.includes(',')||v.includes('"')?`"${v.replace(/"/g,'""')}"`:v; }).join(','));
+  const csv=[headers.join(','),...rows].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`netvault-export-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ── Download Template ─────────────────────────────────────
+function downloadTemplate(fmt){
+  const headers='ip,device,type,mac,branch,user,notes';
+  const sample='192.168.1.100,ROUTER-HQ-01,Router,AA:BB:CC:DD:EE:FF,HQ — Castries,IT Dept,Main gateway';
+  const csv=[headers,sample].join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`netvault-template.${fmt==='xlsx'?'csv':fmt}`;
+  a.click();
 }
 
 // Boot — wait for MSAL script to load first
