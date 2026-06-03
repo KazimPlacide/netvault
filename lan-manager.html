@@ -4,16 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NetVault — LAN IP Registry</title>
+<script type="module">
+import { PublicClientApplication } from 'https://esm.sh/@azure/msal-browser@2.38.3';
+window.__MSALPublicClientApplication = PublicClientApplication;
+window.__msalReady = true;
+</script>
 <script>
-// Load MSAL from unpkg with fallback to jsDelivr
-(function(){
-  function loadScript(src, cb){ var s=document.createElement('script'); s.src=src; s.onload=cb; s.onerror=function(){ console.error('Failed to load MSAL from '+src); }; document.head.appendChild(s); }
-  loadScript('https://unpkg.com/@azure/msal-browser@3.28.0/dist/msal-browser.min.js', function(){
-    if(typeof msal==='undefined'){
-      loadScript('https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/dist/msal-browser.min.js', null);
-    }
-  });
-})();
+// Fallback checker — sets up a poller used by waitForMsal()
+window.__msalReady = window.__msalReady || false;
 </script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -259,15 +257,21 @@ let msalInstance = null;
 
 function waitForMsal(cb, tries){
   tries = tries||0;
-  if(typeof msal !== 'undefined'){
+  if(window.__msalReady && window.__MSALPublicClientApplication){
+    // Use the ES module import
+    const PCA = window.__MSALPublicClientApplication;
+    msalInstance = new PCA(msalConfig);
+    cb();
+  } else if(typeof msal !== 'undefined'){
+    // UMD fallback
     msalInstance = new msal.PublicClientApplication(msalConfig);
     cb();
-  } else if(tries < 50){
+  } else if(tries < 80){
     setTimeout(()=>waitForMsal(cb, tries+1), 100);
   } else {
-    console.error('MSAL failed to load after 5 seconds');
+    console.error('MSAL failed to load');
     enableSignInBtn();
-    document.getElementById('signin-btn').innerHTML='⚠ MSAL failed to load — check console';
+    document.getElementById('signin-btn').innerHTML='⚠ Auth library failed — try refreshing';
   }
 }
 
