@@ -4,7 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NetVault — LAN IP Registry</title>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script>
+// Load MSAL from unpkg with fallback to jsDelivr
+(function(){
+  function loadScript(src, cb){ var s=document.createElement('script'); s.src=src; s.onload=cb; s.onerror=function(){ console.error('Failed to load MSAL from '+src); }; document.head.appendChild(s); }
+  loadScript('https://unpkg.com/@azure/msal-browser@3.28.0/dist/msal-browser.min.js', function(){
+    if(typeof msal==='undefined'){
+      loadScript('https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.0/dist/msal-browser.min.js', null);
+    }
+  });
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -235,14 +245,31 @@ const FOLDER_NAME = 'NetVault';
 const FILE_NAME   = 'netvault-data.json';
 const GRAPH       = 'https://graph.microsoft.com/v1.0';
 
-const msalInstance = new msal.PublicClientApplication({
+const msalConfig = {
   auth:{
     clientId: CLIENT_ID,
     authority:'https://login.microsoftonline.com/common',
     redirectUri: 'https://kazimplacide.github.io/netvault/'
   },
   cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}
-});
+};
+
+// Wait for MSAL to be available before creating instance
+let msalInstance = null;
+
+function waitForMsal(cb, tries){
+  tries = tries||0;
+  if(typeof msal !== 'undefined'){
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    cb();
+  } else if(tries < 50){
+    setTimeout(()=>waitForMsal(cb, tries+1), 100);
+  } else {
+    console.error('MSAL failed to load after 5 seconds');
+    enableSignInBtn();
+    document.getElementById('signin-btn').innerHTML='⚠ MSAL failed to load — check console';
+  }
+}
 
 let currentAccount = null;
 
@@ -493,7 +520,8 @@ function getSeedData(){
   ];
 }
 
-handleStartup();
+// Boot — wait for MSAL script to load first
+waitForMsal(handleStartup);
 </script>
 </body>
 </html>
