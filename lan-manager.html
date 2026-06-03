@@ -4,749 +4,210 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NetVault — LAN IP Registry</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/1.18.4/msal-browser.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0a0e1a;
-    --surface: #111827;
-    --surface2: #1a2235;
-    --border: #1e2d45;
-    --accent: #00e5ff;
-    --accent2: #7c3aed;
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --text: #e2e8f0;
-    --muted: #64748b;
-    --mono: 'IBM Plex Mono', monospace;
-    --sans: 'Syne', sans-serif;
+    --bg:#0a0e1a; --surface:#111827; --surface2:#1a2235; --border:#1e2d45;
+    --accent:#00e5ff; --accent2:#7c3aed; --success:#10b981; --warning:#f59e0b;
+    --danger:#ef4444; --text:#e2e8f0; --muted:#64748b;
+    --mono:'IBM Plex Mono',monospace; --sans:'Syne',sans-serif;
   }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Grid background */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* Auth Screen */
-  #auth-screen {
-    position: fixed;
-    inset: 0;
-    background: var(--bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    flex-direction: column;
-    gap: 2rem;
-  }
-
-  .auth-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-top: 3px solid var(--accent);
-    padding: 3rem;
-    width: 100%;
-    max-width: 420px;
-    position: relative;
-    animation: fadeIn 0.5s ease;
-  }
-
-  .auth-box::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 100%;
-    background: linear-gradient(180deg, rgba(0,229,255,0.04) 0%, transparent 40%);
-    pointer-events: none;
-  }
-
-  .auth-logo {
-    font-family: var(--sans);
-    font-weight: 800;
-    font-size: 1.8rem;
-    color: var(--accent);
-    letter-spacing: -0.02em;
-    margin-bottom: 0.25rem;
-  }
-
-  .auth-sub {
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-bottom: 2rem;
-    letter-spacing: 0.08em;
-  }
-
-  .form-group {
-    margin-bottom: 1.25rem;
-  }
-
-  .form-group label {
-    display: block;
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
-
-  .form-group input, .form-group select {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0.75rem 1rem;
-    font-family: var(--mono);
-    font-size: 0.9rem;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .form-group input:focus, .form-group select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
-  }
-
-  .form-group select option { background: var(--surface); }
-
-  .btn-primary {
-    width: 100%;
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    padding: 0.85rem;
-    font-family: var(--sans);
-    font-weight: 700;
-    font-size: 0.95rem;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .btn-primary:hover {
-    background: #33eaff;
-    transform: translateY(-1px);
-    box-shadow: 0 8px 25px rgba(0,229,255,0.3);
-  }
-
-  .auth-error {
-    font-family: var(--mono);
-    font-size: 0.78rem;
-    color: var(--danger);
-    margin-top: 0.75rem;
-    display: none;
-  }
-
-  /* Main App */
-  #app { display: none; position: relative; z-index: 1; }
-
-  /* Header */
-  header {
-    background: rgba(10,14,26,0.95);
-    border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    backdrop-filter: blur(10px);
-  }
-
-  .logo {
-    font-family: var(--sans);
-    font-weight: 800;
-    font-size: 1.4rem;
-    color: var(--accent);
-    letter-spacing: -0.02em;
-  }
-
-  .logo span { color: var(--muted); font-weight: 400; }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-  }
-
-  .status-pill {
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    color: var(--success);
-    background: rgba(16,185,129,0.1);
-    border: 1px solid rgba(16,185,129,0.25);
-    padding: 0.3rem 0.75rem;
-    letter-spacing: 0.08em;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .status-pill::before {
-    content: '';
-    width: 6px; height: 6px;
-    background: var(--success);
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-  }
-
-  .btn-logout {
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    color: var(--muted);
-    background: none;
-    border: 1px solid var(--border);
-    padding: 0.4rem 0.9rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    letter-spacing: 0.05em;
-  }
-
-  .btn-logout:hover { color: var(--danger); border-color: var(--danger); }
-
-  /* Main layout */
-  main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
-
-  /* Stats bar */
-  .stats-bar {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
-
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 1.25rem 1.5rem;
-    position: relative;
-    overflow: hidden;
-    animation: slideUp 0.4s ease both;
-  }
-
-  .stat-card:nth-child(1) { animation-delay: 0.05s; border-top: 2px solid var(--accent); }
-  .stat-card:nth-child(2) { animation-delay: 0.1s; border-top: 2px solid var(--accent2); }
-  .stat-card:nth-child(3) { animation-delay: 0.15s; border-top: 2px solid var(--success); }
-  .stat-card:nth-child(4) { animation-delay: 0.2s; border-top: 2px solid var(--warning); }
-
-  .stat-label {
-    font-family: var(--mono);
-    font-size: 0.68rem;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
-
-  .stat-value {
-    font-family: var(--mono);
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--text);
-    line-height: 1;
-  }
-
-  /* Controls */
-  .controls {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .search-wrap {
-    flex: 1;
-    min-width: 220px;
-    position: relative;
-  }
-
-  .search-wrap input {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0.7rem 1rem 0.7rem 2.5rem;
-    font-family: var(--mono);
-    font-size: 0.85rem;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .search-wrap input:focus { border-color: var(--accent); }
-
-  .search-wrap::before {
-    content: '⌕';
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--muted);
-    font-size: 1.1rem;
-    pointer-events: none;
-  }
-
-  .filter-select {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0.7rem 1rem;
-    font-family: var(--mono);
-    font-size: 0.82rem;
-    outline: none;
-    cursor: pointer;
-    min-width: 150px;
-  }
-
-  .btn-add {
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    padding: 0.7rem 1.5rem;
-    font-family: var(--sans);
-    font-weight: 700;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    letter-spacing: 0.04em;
-  }
-
-  .btn-add:hover {
-    background: #33eaff;
-    box-shadow: 0 4px 20px rgba(0,229,255,0.3);
-  }
-
-  /* Table */
-  .table-wrap {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    overflow-x: auto;
-    animation: slideUp 0.4s ease 0.25s both;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  thead tr {
-    background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-  }
-
-  th {
-    padding: 0.9rem 1.25rem;
-    font-family: var(--mono);
-    font-size: 0.68rem;
-    color: var(--muted);
-    text-align: left;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    cursor: pointer;
-    user-select: none;
-    transition: color 0.2s;
-  }
-
-  th:hover { color: var(--accent); }
-
-  tbody tr {
-    border-bottom: 1px solid rgba(30,45,69,0.6);
-    transition: background 0.15s;
-  }
-
-  tbody tr:last-child { border-bottom: none; }
-  tbody tr:hover { background: rgba(0,229,255,0.03); }
-
-  td {
-    padding: 0.9rem 1.25rem;
-    font-family: var(--mono);
-    font-size: 0.82rem;
-    color: var(--text);
-    white-space: nowrap;
-  }
-
-  .ip-cell {
-    color: var(--accent);
-    font-weight: 500;
-    letter-spacing: 0.04em;
-  }
-
-  .mac-cell { color: var(--muted); letter-spacing: 0.06em; }
-
-  .branch-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    background: rgba(124,58,237,0.15);
-    border: 1px solid rgba(124,58,237,0.3);
-    color: #a78bfa;
-    padding: 0.2rem 0.6rem;
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-  }
-
-  .device-type {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.78rem;
-    color: #94a3b8;
-  }
-
-  .actions { display: flex; gap: 0.5rem; }
-
-  .btn-edit, .btn-del {
-    background: none;
-    border: 1px solid var(--border);
-    padding: 0.3rem 0.6rem;
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    letter-spacing: 0.04em;
-  }
-
-  .btn-edit { color: var(--accent); }
-  .btn-edit:hover { background: rgba(0,229,255,0.1); border-color: var(--accent); }
-  .btn-del { color: var(--danger); }
-  .btn-del:hover { background: rgba(239,68,68,0.1); border-color: var(--danger); }
-
-  .empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: var(--muted);
-    font-family: var(--mono);
-    font-size: 0.85rem;
-  }
-
-  .empty-state .big { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.4; }
-
-  /* Modal */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(4px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 500;
-    padding: 1rem;
-  }
-
-  .modal-overlay.open { display: flex; }
-
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-top: 3px solid var(--accent);
-    padding: 2rem;
-    width: 100%;
-    max-width: 520px;
-    animation: fadeIn 0.25s ease;
-    position: relative;
-  }
-
-  .modal h2 {
-    font-family: var(--sans);
-    font-weight: 700;
-    font-size: 1.15rem;
-    margin-bottom: 0.35rem;
-    color: var(--text);
-  }
-
-  .modal-sub {
-    font-family: var(--mono);
-    font-size: 0.72rem;
-    color: var(--muted);
-    margin-bottom: 1.75rem;
-    letter-spacing: 0.06em;
-  }
-
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-
-  .form-group.full { grid-column: 1 / -1; }
-
-  .modal-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1.75rem;
-    justify-content: flex-end;
-  }
-
-  .btn-cancel {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 0.7rem 1.5rem;
-    font-family: var(--sans);
-    font-weight: 600;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    letter-spacing: 0.03em;
-  }
-
-  .btn-cancel:hover { border-color: var(--muted); color: var(--text); }
-
-  .btn-save {
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    padding: 0.7rem 1.75rem;
-    font-family: var(--sans);
-    font-weight: 700;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    letter-spacing: 0.04em;
-  }
-
-  .btn-save:hover { background: #33eaff; box-shadow: 0 4px 20px rgba(0,229,255,0.3); }
-
-  /* Toast */
-  .toast {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--success);
-    padding: 0.9rem 1.5rem;
-    font-family: var(--mono);
-    font-size: 0.82rem;
-    color: var(--text);
-    z-index: 999;
-    transform: translateY(100px);
-    opacity: 0;
-    transition: all 0.3s ease;
-    min-width: 260px;
-  }
-
-  .toast.show { transform: translateY(0); opacity: 1; }
-  .toast.error { border-left-color: var(--danger); }
-
-  @keyframes fadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
-  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-  /* Delete confirm */
-  .confirm-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.75);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 600;
-  }
-
-  .confirm-overlay.open { display: flex; }
-
-  .confirm-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-top: 3px solid var(--danger);
-    padding: 2rem;
-    max-width: 380px;
-    width: 90%;
-    animation: fadeIn 0.2s ease;
-    text-align: center;
-  }
-
-  .confirm-box h3 { font-size: 1rem; margin-bottom: 0.5rem; }
-  .confirm-box p { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); margin-bottom: 1.5rem; }
-
-  .confirm-actions { display: flex; gap: 0.75rem; justify-content: center; }
-
-  .btn-confirm-del {
-    background: var(--danger);
-    color: #fff;
-    border: none;
-    padding: 0.65rem 1.5rem;
-    font-family: var(--sans);
-    font-weight: 700;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-confirm-del:hover { background: #dc2626; }
-
-  @media (max-width: 900px) {
-    .stats-bar { grid-template-columns: 1fr 1fr; }
-    .form-grid { grid-template-columns: 1fr; }
-  }
-
-  @media (max-width: 600px) {
-    main { padding: 1rem; }
-    header { padding: 0 1rem; }
-    .stats-bar { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-    .stat-value { font-size: 1.5rem; }
-    th, td { padding: 0.7rem 0.75rem; }
-  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+  #auth-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000;flex-direction:column;gap:2rem}
+  .auth-box{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);padding:3rem;width:100%;max-width:420px;position:relative;animation:fadeIn .5s ease}
+  .auth-box::before{content:'';position:absolute;top:0;left:0;right:0;height:100%;background:linear-gradient(180deg,rgba(0,229,255,.04) 0%,transparent 40%);pointer-events:none}
+  .auth-logo{font-family:var(--sans);font-weight:800;font-size:1.8rem;color:var(--accent);letter-spacing:-.02em;margin-bottom:.25rem}
+  .auth-sub{font-family:var(--mono);font-size:.75rem;color:var(--muted);margin-bottom:2rem;letter-spacing:.08em}
+  .auth-desc{font-family:var(--mono);font-size:.78rem;color:var(--muted);line-height:1.7;margin-bottom:2rem;border-left:2px solid var(--border);padding-left:1rem}
+  .btn-ms{width:100%;background:#2563eb;color:#fff;border:none;padding:.9rem;font-family:var(--sans);font-weight:700;font-size:.95rem;letter-spacing:.04em;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.75rem}
+  .btn-ms:hover{background:#1d4ed8;box-shadow:0 8px 25px rgba(37,99,235,.4);transform:translateY(-1px)}
+  .auth-note{font-family:var(--mono);font-size:.68rem;color:var(--muted);text-align:center;margin-top:1rem}
+
+  #loading-screen{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:900;flex-direction:column;gap:1.5rem}
+  #loading-screen.show{display:flex}
+  .spinner{width:40px;height:40px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  .loading-msg{font-family:var(--mono);font-size:.82rem;color:var(--muted)}
+
+  #app{display:none;position:relative;z-index:1}
+  header{background:rgba(10,14,26,.95);border-bottom:1px solid var(--border);padding:0 2rem;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
+  .logo{font-family:var(--sans);font-weight:800;font-size:1.4rem;color:var(--accent);letter-spacing:-.02em}
+  .logo span{color:var(--muted);font-weight:400}
+  .header-right{display:flex;align-items:center;gap:1rem}
+  .sync-status{font-family:var(--mono);font-size:.7rem;padding:.3rem .75rem;letter-spacing:.08em;display:flex;align-items:center;gap:.4rem;border:1px solid;transition:all .3s}
+  .sync-status.ok{color:var(--success);background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.25)}
+  .sync-status.syncing{color:var(--warning);background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25)}
+  .sync-status.error{color:var(--danger);background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25)}
+  .sync-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+  .user-pill{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+  .btn-logout{font-family:var(--mono);font-size:.75rem;color:var(--muted);background:none;border:1px solid var(--border);padding:.4rem .9rem;cursor:pointer;transition:all .2s;letter-spacing:.05em}
+  .btn-logout:hover{color:var(--danger);border-color:var(--danger)}
+  .btn-sync{font-family:var(--mono);font-size:.75rem;color:var(--accent);background:none;border:1px solid rgba(0,229,255,.3);padding:.4rem .9rem;cursor:pointer;transition:all .2s;letter-spacing:.05em}
+  .btn-sync:hover{background:rgba(0,229,255,.08)}
+
+  main{padding:2rem;max-width:1400px;margin:0 auto}
+  .stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
+  .stat-card{background:var(--surface);border:1px solid var(--border);padding:1.25rem 1.5rem;position:relative;overflow:hidden;animation:slideUp .4s ease both}
+  .stat-card:nth-child(1){animation-delay:.05s;border-top:2px solid var(--accent)}
+  .stat-card:nth-child(2){animation-delay:.1s;border-top:2px solid var(--accent2)}
+  .stat-card:nth-child(3){animation-delay:.15s;border-top:2px solid var(--success)}
+  .stat-card:nth-child(4){animation-delay:.2s;border-top:2px solid var(--warning)}
+  .stat-label{font-family:var(--mono);font-size:.68rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem}
+  .stat-value{font-family:var(--mono);font-size:2rem;font-weight:600;color:var(--text);line-height:1}
+
+  .controls{display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+  .search-wrap{flex:1;min-width:220px;position:relative}
+  .search-wrap input{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:.7rem 1rem .7rem 2.5rem;font-family:var(--mono);font-size:.85rem;outline:none;transition:border-color .2s}
+  .search-wrap input:focus{border-color:var(--accent)}
+  .search-wrap::before{content:'⌕';position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:var(--muted);font-size:1.1rem;pointer-events:none}
+  .filter-select{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:.7rem 1rem;font-family:var(--mono);font-size:.82rem;outline:none;cursor:pointer;min-width:150px}
+  .btn-add{background:var(--accent);color:var(--bg);border:none;padding:.7rem 1.5rem;font-family:var(--sans);font-weight:700;font-size:.85rem;cursor:pointer;transition:all .2s;white-space:nowrap;letter-spacing:.04em}
+  .btn-add:hover{background:#33eaff;box-shadow:0 4px 20px rgba(0,229,255,.3)}
+
+  .table-wrap{background:var(--surface);border:1px solid var(--border);overflow-x:auto;animation:slideUp .4s ease .25s both}
+  table{width:100%;border-collapse:collapse}
+  thead tr{background:var(--surface2);border-bottom:1px solid var(--border)}
+  th{padding:.9rem 1.25rem;font-family:var(--mono);font-size:.68rem;color:var(--muted);text-align:left;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;cursor:pointer;user-select:none;transition:color .2s}
+  th:hover{color:var(--accent)}
+  tbody tr{border-bottom:1px solid rgba(30,45,69,.6);transition:background .15s}
+  tbody tr:last-child{border-bottom:none}
+  tbody tr:hover{background:rgba(0,229,255,.03)}
+  td{padding:.9rem 1.25rem;font-family:var(--mono);font-size:.82rem;color:var(--text);white-space:nowrap}
+  .ip-cell{color:var(--accent);font-weight:500;letter-spacing:.04em}
+  .mac-cell{color:var(--muted);letter-spacing:.06em}
+  .branch-badge{display:inline-flex;align-items:center;gap:.35rem;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:#a78bfa;padding:.2rem .6rem;font-size:.72rem;letter-spacing:.06em}
+  .device-type{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;color:#94a3b8}
+  .actions{display:flex;gap:.5rem}
+  .btn-edit,.btn-del{background:none;border:1px solid var(--border);padding:.3rem .6rem;font-family:var(--mono);font-size:.7rem;cursor:pointer;transition:all .2s;letter-spacing:.04em}
+  .btn-edit{color:var(--accent)}.btn-edit:hover{background:rgba(0,229,255,.1);border-color:var(--accent)}
+  .btn-del{color:var(--danger)}.btn-del:hover{background:rgba(239,68,68,.1);border-color:var(--danger)}
+  .empty-state{text-align:center;padding:4rem 2rem;color:var(--muted);font-family:var(--mono);font-size:.85rem}
+  .empty-state .big{font-size:2.5rem;margin-bottom:1rem;opacity:.4}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:500;padding:1rem}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);padding:2rem;width:100%;max-width:520px;animation:fadeIn .25s ease}
+  .modal h2{font-family:var(--sans);font-weight:700;font-size:1.15rem;margin-bottom:.35rem}
+  .modal-sub{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-bottom:1.75rem;letter-spacing:.06em}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  .form-group{margin-bottom:0}
+  .form-group.full{grid-column:1/-1}
+  .form-group label{display:block;font-family:var(--mono);font-size:.7rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem}
+  .form-group input,.form-group select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:.75rem 1rem;font-family:var(--mono);font-size:.9rem;outline:none;transition:border-color .2s}
+  .form-group input:focus,.form-group select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,255,.08)}
+  .form-group select option{background:var(--surface)}
+  .modal-actions{display:flex;gap:.75rem;margin-top:1.75rem;justify-content:flex-end}
+  .btn-cancel{background:none;border:1px solid var(--border);color:var(--muted);padding:.7rem 1.5rem;font-family:var(--sans);font-weight:600;font-size:.85rem;cursor:pointer;transition:all .2s;letter-spacing:.03em}
+  .btn-cancel:hover{border-color:var(--muted);color:var(--text)}
+  .btn-save{background:var(--accent);color:var(--bg);border:none;padding:.7rem 1.75rem;font-family:var(--sans);font-weight:700;font-size:.85rem;cursor:pointer;transition:all .2s;letter-spacing:.04em}
+  .btn-save:hover{background:#33eaff;box-shadow:0 4px 20px rgba(0,229,255,.3)}
+
+  .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:600}
+  .confirm-overlay.open{display:flex}
+  .confirm-box{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--danger);padding:2rem;max-width:380px;width:90%;animation:fadeIn .2s ease;text-align:center}
+  .confirm-box h3{font-size:1rem;margin-bottom:.5rem}
+  .confirm-box p{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-bottom:1.5rem}
+  .confirm-actions{display:flex;gap:.75rem;justify-content:center}
+  .btn-confirm-del{background:var(--danger);color:#fff;border:none;padding:.65rem 1.5rem;font-family:var(--sans);font-weight:700;font-size:.85rem;cursor:pointer;transition:all .2s}
+  .btn-confirm-del:hover{background:#dc2626}
+
+  .toast{position:fixed;bottom:2rem;right:2rem;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--success);padding:.9rem 1.5rem;font-family:var(--mono);font-size:.82rem;color:var(--text);z-index:999;transform:translateY(100px);opacity:0;transition:all .3s ease;min-width:260px}
+  .toast.show{transform:translateY(0);opacity:1}
+  .toast.error{border-left-color:var(--danger)}
+  .toast.warn{border-left-color:var(--warning)}
+
+  @keyframes fadeIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media(max-width:900px){.stats-bar{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}}
+  @media(max-width:600px){main{padding:1rem}header{padding:0 1rem}.stats-bar{grid-template-columns:1fr 1fr;gap:.5rem}.stat-value{font-size:1.5rem}th,td{padding:.7rem .75rem}.user-pill{display:none}}
 </style>
 </head>
 <body>
 
-<!-- Auth Screen -->
 <div id="auth-screen">
   <div class="auth-box">
     <div class="auth-logo">NetVault</div>
-    <div class="auth-sub">// LAN IP REGISTRY — RESTRICTED ACCESS</div>
-    <div class="form-group">
-      <label>Username</label>
-      <input type="text" id="auth-user" placeholder="admin" autocomplete="username">
+    <div class="auth-sub">// LAN IP REGISTRY — ONEDRIVE SYNC</div>
+    <div class="auth-desc">
+      Sign in with your Microsoft account to access the registry.<br>
+      Data is stored as <strong style="color:var(--text)">netvault-data.json</strong> inside a
+      <strong style="color:var(--text)">NetVault</strong> folder on your OneDrive —
+      synced automatically across all devices.
     </div>
-    <div class="form-group">
-      <label>Password</label>
-      <input type="password" id="auth-pass" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <button class="btn-primary" onclick="login()">AUTHENTICATE</button>
-    <div class="auth-error" id="auth-error">Invalid credentials. Access denied.</div>
-    <div style="margin-top:1.5rem; font-family:var(--mono); font-size:0.7rem; color:var(--muted);">
-      Default: admin / netvault2024
-    </div>
+    <button class="btn-ms" onclick="signIn()">
+      <svg width="20" height="20" viewBox="0 0 21 21" fill="none"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      SIGN IN WITH MICROSOFT
+    </button>
+    <div class="auth-note">Your credentials are handled securely by Microsoft. NetVault never sees your password.</div>
   </div>
 </div>
 
-<!-- App -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-msg" id="loading-msg">Connecting to OneDrive...</div>
+</div>
+
 <div id="app">
   <header>
     <div class="logo">Net<span>Vault</span></div>
     <div class="header-right">
-      <div class="status-pill">SYSTEM ONLINE</div>
-      <button class="btn-logout" onclick="logout()">SIGN OUT</button>
+      <div class="sync-status ok" id="sync-status"><span class="sync-dot"></span><span id="sync-label">SYNCED</span></div>
+      <button class="btn-sync" onclick="syncNow()">↻ SYNC</button>
+      <span class="user-pill" id="user-pill"></span>
+      <button class="btn-logout" onclick="signOut()">SIGN OUT</button>
     </div>
   </header>
-
   <main>
     <div class="stats-bar">
-      <div class="stat-card">
-        <div class="stat-label">Total Devices</div>
-        <div class="stat-value" id="stat-total">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Branches</div>
-        <div class="stat-value" id="stat-branches">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Device Types</div>
-        <div class="stat-value" id="stat-types">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Last Updated</div>
-        <div class="stat-value" id="stat-updated" style="font-size:1rem; padding-top:0.4rem;">—</div>
-      </div>
+      <div class="stat-card"><div class="stat-label">Total Devices</div><div class="stat-value" id="stat-total">0</div></div>
+      <div class="stat-card"><div class="stat-label">Branches</div><div class="stat-value" id="stat-branches">0</div></div>
+      <div class="stat-card"><div class="stat-label">Device Types</div><div class="stat-value" id="stat-types">0</div></div>
+      <div class="stat-card"><div class="stat-label">Last Saved</div><div class="stat-value" id="stat-updated" style="font-size:1rem;padding-top:.4rem">—</div></div>
     </div>
-
     <div class="controls">
-      <div class="search-wrap">
-        <input type="text" id="search-input" placeholder="Search IP, device, MAC, branch..." oninput="renderTable()">
-      </div>
-      <select class="filter-select" id="filter-branch" onchange="renderTable()">
-        <option value="">All Branches</option>
-      </select>
-      <select class="filter-select" id="filter-type" onchange="renderTable()">
-        <option value="">All Device Types</option>
-      </select>
+      <div class="search-wrap"><input type="text" id="search-input" placeholder="Search IP, device, MAC, branch..." oninput="renderTable()"></div>
+      <select class="filter-select" id="filter-branch" onchange="renderTable()"><option value="">All Branches</option></select>
+      <select class="filter-select" id="filter-type" onchange="renderTable()"><option value="">All Device Types</option></select>
       <button class="btn-add" onclick="openModal()">+ ADD DEVICE</button>
     </div>
-
     <div class="table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th onclick="sortBy('ip')">IP ADDRESS ↕</th>
-            <th onclick="sortBy('device')">DEVICE NAME ↕</th>
-            <th onclick="sortBy('type')">TYPE ↕</th>
-            <th onclick="sortBy('mac')">MAC ADDRESS ↕</th>
-            <th onclick="sortBy('branch')">BRANCH ↕</th>
-            <th>NOTES</th>
-            <th>ACTIONS</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th onclick="sortBy('ip')">IP ADDRESS ↕</th>
+          <th onclick="sortBy('device')">DEVICE NAME ↕</th>
+          <th onclick="sortBy('type')">TYPE ↕</th>
+          <th onclick="sortBy('mac')">MAC ADDRESS ↕</th>
+          <th onclick="sortBy('branch')">BRANCH ↕</th>
+          <th>NOTES</th>
+          <th>ACTIONS</th>
+        </tr></thead>
         <tbody id="table-body"></tbody>
       </table>
     </div>
   </main>
 </div>
 
-<!-- Add/Edit Modal -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <h2 id="modal-title">Add New Device</h2>
     <div class="modal-sub" id="modal-sub">// REGISTER A NEW NETWORK ASSET</div>
     <div class="form-grid">
-      <div class="form-group">
-        <label>IP Address *</label>
-        <input type="text" id="f-ip" placeholder="192.168.1.100">
+      <div class="form-group"><label>IP Address *</label><input type="text" id="f-ip" placeholder="192.168.1.100"></div>
+      <div class="form-group"><label>Device Name *</label><input type="text" id="f-device" placeholder="ROUTER-HQ-01"></div>
+      <div class="form-group"><label>Device Type *</label>
+        <select id="f-type"><option value="">Select type...</option><option>Router</option><option>Switch</option><option>Server</option><option>Workstation</option><option>Printer</option><option>IP Camera</option><option>Access Point</option><option>Firewall</option><option>NAS</option><option>VoIP Phone</option><option>Other</option></select>
       </div>
-      <div class="form-group">
-        <label>Device Name *</label>
-        <input type="text" id="f-device" placeholder="ROUTER-HQ-01">
-      </div>
-      <div class="form-group">
-        <label>Device Type *</label>
-        <select id="f-type">
-          <option value="">Select type...</option>
-          <option>Router</option>
-          <option>Switch</option>
-          <option>Server</option>
-          <option>Workstation</option>
-          <option>Printer</option>
-          <option>IP Camera</option>
-          <option>Access Point</option>
-          <option>Firewall</option>
-          <option>NAS</option>
-          <option>VoIP Phone</option>
-          <option>Other</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>MAC Address *</label>
-        <input type="text" id="f-mac" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" oninput="formatMac(this)">
-      </div>
-      <div class="form-group">
-        <label>Branch Location *</label>
-        <input type="text" id="f-branch" placeholder="HQ — Castries" list="branch-list">
-        <datalist id="branch-list"></datalist>
-      </div>
-      <div class="form-group">
-        <label>Assigned User</label>
-        <input type="text" id="f-user" placeholder="John Smith">
-      </div>
-      <div class="form-group full">
-        <label>Notes</label>
-        <input type="text" id="f-notes" placeholder="Optional description or location notes...">
-      </div>
+      <div class="form-group"><label>MAC Address *</label><input type="text" id="f-mac" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" oninput="formatMac(this)"></div>
+      <div class="form-group"><label>Branch Location *</label><input type="text" id="f-branch" placeholder="HQ — Castries" list="branch-list"><datalist id="branch-list"></datalist></div>
+      <div class="form-group"><label>Assigned User</label><input type="text" id="f-user" placeholder="John Smith"></div>
+      <div class="form-group full"><label>Notes</label><input type="text" id="f-notes" placeholder="Optional description..."></div>
     </div>
-    <div id="modal-error" style="font-family:var(--mono);font-size:0.75rem;color:var(--danger);margin-top:0.75rem;display:none;"></div>
+    <div id="modal-error" style="font-family:var(--mono);font-size:.75rem;color:var(--danger);margin-top:.75rem;display:none;"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">CANCEL</button>
       <button class="btn-save" onclick="saveDevice()">SAVE DEVICE</button>
@@ -754,11 +215,10 @@
   </div>
 </div>
 
-<!-- Delete Confirm -->
 <div class="confirm-overlay" id="confirm-overlay">
   <div class="confirm-box">
     <h3>Remove Device?</h3>
-    <p id="confirm-msg">This will permanently delete this entry from the registry.</p>
+    <p id="confirm-msg">This will permanently delete this entry.</p>
     <div class="confirm-actions">
       <button class="btn-cancel" onclick="closeConfirm()">CANCEL</button>
       <button class="btn-confirm-del" onclick="confirmDelete()">DELETE</button>
@@ -769,269 +229,259 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const CREDENTIALS = { user: 'admin', pass: 'netvault2024' };
+const CLIENT_ID   = '84feaac4-a698-4430-88fb-229eb57d3a69';
+const SCOPES      = ['Files.ReadWrite','User.Read'];
+const FOLDER_NAME = 'NetVault';
+const FILE_NAME   = 'netvault-data.json';
+const GRAPH       = 'https://graph.microsoft.com/v1.0';
 
-  function login() {
-    const u = document.getElementById('auth-user').value.trim();
-    const p = document.getElementById('auth-pass').value;
-    if (u === CREDENTIALS.user && p === CREDENTIALS.pass) {
-      document.getElementById('auth-screen').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      updateStats();
-      renderTable();
-    } else {
-      document.getElementById('auth-error').style.display = 'block';
-    }
+const msalInstance = new msal.PublicClientApplication({
+  auth:{
+    clientId: CLIENT_ID,
+    authority:'https://login.microsoftonline.com/common',
+    redirectUri: 'https://kazimplacide.github.io/netvault/'
+  },
+  cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}
+});
+
+let currentAccount = null;
+
+async function getToken(){
+  const req={scopes:SCOPES,account:currentAccount};
+  try{ return (await msalInstance.acquireTokenSilent(req)).accessToken; }
+  catch{ return (await msalInstance.acquireTokenPopup(req)).accessToken; }
+}
+
+async function signIn(){
+  try{
+    showLoading('Signing in...');
+    const res = await msalInstance.loginPopup({scopes:SCOPES});
+    currentAccount = res.account;
+    await initApp();
+  } catch(e){
+    hideLoading();
+    showToast('Sign-in cancelled or failed.','error');
+    console.error(e);
   }
+}
 
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && document.getElementById('auth-screen').style.display !== 'none') login();
+async function signOut(){
+  await msalInstance.logoutPopup({account:currentAccount});
+  currentAccount=null; location.reload();
+}
+
+async function handleStartup(){
+  await msalInstance.initialize();
+  try{ await msalInstance.handleRedirectPromise(); }catch{}
+  const accs = msalInstance.getAllAccounts();
+  if(accs.length>0){ currentAccount=accs[0]; showLoading('Loading your data...'); await initApp(); }
+}
+
+async function apiCall(method,path,body){
+  const token=await getToken();
+  const opts={method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}};
+  if(body!==undefined) opts.body=typeof body==='string'?body:JSON.stringify(body);
+  const res=await fetch(`${GRAPH}${path}`,opts);
+  if(!res.ok){ const e=await res.text(); throw new Error(`Graph ${method} ${path} -> ${res.status}: ${e}`); }
+  const ct=res.headers.get('content-type')||'';
+  return ct.includes('application/json')?res.json():res.text();
+}
+
+async function ensureFolder(){
+  try{ await apiCall('GET',`/me/drive/root:/${FOLDER_NAME}`); }
+  catch{ await apiCall('POST','/me/drive/root/children',{name:FOLDER_NAME,folder:{},
+    '@microsoft.graph.conflictBehavior':'rename'}); }
+}
+
+async function loadFromOneDrive(){
+  try{
+    const data=await apiCall('GET',`/me/drive/root:/${FOLDER_NAME}/${FILE_NAME}:/content`);
+    return typeof data==='string'?JSON.parse(data):data;
+  }catch(e){
+    if(String(e).includes('404')||String(e).includes('itemNotFound')) return null;
+    throw e;
+  }
+}
+
+async function saveToOneDrive(payload){
+  const token=await getToken();
+  const res=await fetch(`${GRAPH}/me/drive/root:/${FOLDER_NAME}/${FILE_NAME}:/content`,
+    {method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+     body:JSON.stringify(payload,null,2)});
+  if(!res.ok) throw new Error(`Save failed: ${res.status}`);
+}
+
+let devices=[]; let sortCol='ip',sortDir=1;
+
+async function initApp(){
+  try{
+    setLoading('Connecting to OneDrive...');
+    const me=await apiCall('GET','/me?$select=displayName,mail');
+    document.getElementById('user-pill').textContent=me.displayName||me.mail||'';
+    setLoading('Ensuring NetVault folder...');
+    await ensureFolder();
+    setLoading('Loading device registry...');
+    const stored=await loadFromOneDrive();
+    if(stored&&Array.isArray(stored.devices)) devices=stored.devices;
+    else{ devices=getSeedData(); await saveToOneDrive({devices,lastSaved:new Date().toISOString()}); }
+    hideLoading();
+    document.getElementById('auth-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    setSyncStatus('ok','SYNCED');
+    document.getElementById('stat-updated').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    updateStats(); renderTable();
+  }catch(e){
+    hideLoading(); setSyncStatus('error','ERROR');
+    showToast('Failed to connect to OneDrive. See console.','error'); console.error(e);
+  }
+}
+
+async function syncNow(){
+  setSyncStatus('syncing','SYNCING...');
+  try{
+    const stored=await loadFromOneDrive();
+    if(stored&&Array.isArray(stored.devices)){ devices=stored.devices; renderTable(); updateStats(); }
+    setSyncStatus('ok','SYNCED'); showToast('Registry refreshed from OneDrive');
+  }catch(e){ setSyncStatus('error','SYNC FAILED'); showToast('Sync failed','error'); }
+}
+
+async function persistDevices(){
+  setSyncStatus('syncing','SAVING...');
+  try{
+    await saveToOneDrive({devices,lastSaved:new Date().toISOString()});
+    setSyncStatus('ok','SYNCED');
+    document.getElementById('stat-updated').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ setSyncStatus('error','SAVE FAILED'); showToast('Could not save to OneDrive','error'); console.error(e); }
+}
+
+function showLoading(msg){ document.getElementById('loading-screen').classList.add('show'); document.getElementById('loading-msg').textContent=msg||'Loading...'; }
+function setLoading(msg){ document.getElementById('loading-msg').textContent=msg; }
+function hideLoading(){ document.getElementById('loading-screen').classList.remove('show'); }
+function setSyncStatus(type,label){ document.getElementById('sync-status').className=`sync-status ${type}`; document.getElementById('sync-label').textContent=label; }
+function showToast(msg,type=''){
+  const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast ${type}`; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+const deviceIcons={Router:'⬡',Switch:'⬢',Server:'▣',Workstation:'▪',Printer:'▫','IP Camera':'◉','Access Point':'◎',Firewall:'◈',NAS:'▦','VoIP Phone':'◇',Other:'◆'};
+
+function renderTable(){
+  const q=document.getElementById('search-input').value.toLowerCase();
+  const fb=document.getElementById('filter-branch').value;
+  const ft=document.getElementById('filter-type').value;
+  let list=devices.filter(d=>{
+    const hit=[d.ip,d.device,d.mac,d.branch,d.type,d.user||'',d.notes||''].join(' ').toLowerCase().includes(q);
+    return hit&&(!fb||d.branch===fb)&&(!ft||d.type===ft);
   });
+  list.sort((a,b)=>{
+    const av=a[sortCol]||'',bv=b[sortCol]||'';
+    if(sortCol==='ip') return sortDir*(ipToNum(av)-ipToNum(bv));
+    return sortDir*av.localeCompare(bv);
+  });
+  const tbody=document.getElementById('table-body');
+  if(!list.length){ tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="big">◈</div>No devices found.</div></td></tr>`; return; }
+  tbody.innerHTML=list.map(d=>`<tr>
+    <td class="ip-cell">${esc(d.ip)}</td>
+    <td>${esc(d.device)}</td>
+    <td><span class="device-type">${deviceIcons[d.type]||'◆'} ${esc(d.type)}</span></td>
+    <td class="mac-cell">${esc(d.mac)}</td>
+    <td><span class="branch-badge">⬡ ${esc(d.branch)}</span></td>
+    <td style="color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;">${esc(d.notes||(d.user?'User: '+d.user:'—'))}</td>
+    <td class="actions"><button class="btn-edit" onclick="openEdit('${d.id}')">EDIT</button><button class="btn-del" onclick="askDelete('${d.id}')">DEL</button></td>
+  </tr>`).join('');
+  updateFilters(); updateStats();
+}
 
-  function logout() {
-    document.getElementById('auth-screen').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
-    document.getElementById('auth-pass').value = '';
-  }
+function updateStats(){
+  document.getElementById('stat-total').textContent=devices.length;
+  document.getElementById('stat-branches').textContent=new Set(devices.map(d=>d.branch)).size;
+  document.getElementById('stat-types').textContent=new Set(devices.map(d=>d.type)).size;
+}
 
-  // ── Data ──────────────────────────────────────────────────────────────────
-  let devices = JSON.parse(localStorage.getItem('netvault_devices') || '[]');
+function updateFilters(){
+  const branches=[...new Set(devices.map(d=>d.branch))].sort();
+  const types=[...new Set(devices.map(d=>d.type))].sort();
+  const fb=document.getElementById('filter-branch'),curB=fb.value;
+  const ft=document.getElementById('filter-type'),curT=ft.value;
+  fb.innerHTML='<option value="">All Branches</option>'+branches.map(b=>`<option${b===curB?' selected':''}>${b}</option>`).join('');
+  ft.innerHTML='<option value="">All Device Types</option>'+types.map(t=>`<option${t===curT?' selected':''}>${t}</option>`).join('');
+  document.getElementById('branch-list').innerHTML=branches.map(b=>`<option value="${b}">`).join('');
+}
 
-  // Seed sample data if empty
-  if (devices.length === 0) {
-    devices = [
-      { id: uid(), ip: '192.168.1.1',   device: 'ROUTER-HQ-01',    type: 'Router',      mac: 'A4:C3:F0:12:34:56', branch: 'HQ — Castries',    user: 'IT Dept',    notes: 'Main gateway',          added: Date.now() },
-      { id: uid(), ip: '192.168.1.2',   device: 'SW-HQ-CORE',      type: 'Switch',      mac: 'B0:7D:64:AB:CD:EF', branch: 'HQ — Castries',    user: 'IT Dept',    notes: 'Core layer-3 switch',   added: Date.now() },
-      { id: uid(), ip: '192.168.1.10',  device: 'SRV-FILE-01',     type: 'Server',      mac: 'D4:3D:7E:A1:B2:C3', branch: 'HQ — Castries',    user: '',           notes: 'File server',           added: Date.now() },
-      { id: uid(), ip: '192.168.1.50',  device: 'WS-ACCT-01',      type: 'Workstation', mac: 'F8:1A:67:11:22:33', branch: 'HQ — Castries',    user: 'Mary John',  notes: 'Accounts dept',         added: Date.now() },
-      { id: uid(), ip: '192.168.2.1',   device: 'ROUTER-VF-01',    type: 'Router',      mac: 'C8:D7:19:44:55:66', branch: 'Branch — Vieux Fort', user: 'IT Dept', notes: 'Site router',           added: Date.now() },
-      { id: uid(), ip: '192.168.2.20',  device: 'CAM-VF-LOBBY',    type: 'IP Camera',   mac: '00:1A:2B:3C:4D:5E', branch: 'Branch — Vieux Fort', user: 'Security', notes: 'Lobby camera',         added: Date.now() },
-      { id: uid(), ip: '192.168.3.1',   device: 'ROUTER-GS-01',    type: 'Router',      mac: 'E8:4E:06:77:88:99', branch: 'Branch — Gros Islet', user: 'IT Dept', notes: 'Site router',           added: Date.now() },
-      { id: uid(), ip: '192.168.3.5',   device: 'AP-GS-FLOOR1',    type: 'Access Point',mac: '70:3A:CB:AA:BB:CC', branch: 'Branch — Gros Islet', user: '',         notes: 'Floor 1 Wi-Fi',        added: Date.now() },
-    ];
-    save();
-  }
+function sortBy(col){ if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=1;} renderTable(); }
+function ipToNum(ip){ return (ip||'0.0.0.0').split('.').reduce((a,o)=>a*256+parseInt(o,10),0); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-  function save() {
-    localStorage.setItem('netvault_devices', JSON.stringify(devices));
-    document.getElementById('stat-updated').textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-  }
+let editingId=null;
+function openModal(){
+  editingId=null;
+  document.getElementById('modal-title').textContent='Add New Device';
+  document.getElementById('modal-sub').textContent='// REGISTER A NEW NETWORK ASSET';
+  ['f-ip','f-device','f-type','f-mac','f-branch','f-user','f-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('modal-error').style.display='none';
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('f-ip').focus();
+}
+function openEdit(id){
+  const d=devices.find(x=>x.id===id); if(!d)return;
+  editingId=id;
+  document.getElementById('modal-title').textContent='Edit Device';
+  document.getElementById('modal-sub').textContent='// MODIFY NETWORK ASSET RECORD';
+  document.getElementById('f-ip').value=d.ip; document.getElementById('f-device').value=d.device;
+  document.getElementById('f-type').value=d.type; document.getElementById('f-mac').value=d.mac;
+  document.getElementById('f-branch').value=d.branch; document.getElementById('f-user').value=d.user||'';
+  document.getElementById('f-notes').value=d.notes||'';
+  document.getElementById('modal-error').style.display='none';
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
 
-  // ── Sort ──────────────────────────────────────────────────────────────────
-  let sortCol = 'ip', sortDir = 1;
+async function saveDevice(){
+  const ip=document.getElementById('f-ip').value.trim();
+  const device=document.getElementById('f-device').value.trim();
+  const type=document.getElementById('f-type').value;
+  const mac=document.getElementById('f-mac').value.trim().toUpperCase();
+  const branch=document.getElementById('f-branch').value.trim();
+  const user=document.getElementById('f-user').value.trim();
+  const notes=document.getElementById('f-notes').value.trim();
+  const ipRe=/^(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+  const macRe=/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/;
+  const err=document.getElementById('modal-error');
+  if(!ip||!ipRe.test(ip)){showErr(err,'Enter a valid IP address (e.g. 192.168.1.100)');return;}
+  if(!device){showErr(err,'Device name is required');return;}
+  if(!type){showErr(err,'Select a device type');return;}
+  if(!mac||!macRe.test(mac)){showErr(err,'Enter a valid MAC address (AA:BB:CC:DD:EE:FF)');return;}
+  if(!branch){showErr(err,'Branch location is required');return;}
+  const dup=devices.find(d=>d.ip===ip&&d.id!==editingId);
+  if(dup){showErr(err,`IP ${ip} already assigned to ${dup.device}`);return;}
+  if(editingId){ const idx=devices.findIndex(d=>d.id===editingId); devices[idx]={...devices[idx],ip,device,type,mac,branch,user,notes}; showToast('Device updated'); }
+  else{ devices.push({id:uid(),ip,device,type,mac,branch,user,notes,added:Date.now()}); showToast('Device added to registry'); }
+  closeModal(); renderTable(); await persistDevices();
+}
+function showErr(el,msg){el.textContent='⚠ '+msg;el.style.display='block';}
 
-  function sortBy(col) {
-    if (sortCol === col) sortDir *= -1;
-    else { sortCol = col; sortDir = 1; }
-    renderTable();
-  }
+let deleteId=null;
+function askDelete(id){ deleteId=id; const d=devices.find(x=>x.id===id); document.getElementById('confirm-msg').textContent=`Delete "${d.device}" (${d.ip})? This cannot be undone.`; document.getElementById('confirm-overlay').classList.add('open'); }
+function closeConfirm(){ deleteId=null; document.getElementById('confirm-overlay').classList.remove('open'); }
+async function confirmDelete(){ devices=devices.filter(d=>d.id!==deleteId); closeConfirm(); renderTable(); showToast('Device removed','error'); await persistDevices(); }
 
-  function ipToNum(ip) {
-    return ip.split('.').reduce((acc, o) => acc * 256 + parseInt(o, 10), 0);
-  }
+function formatMac(el){ let v=el.value.replace(/[^0-9a-fA-F]/g,'').toUpperCase().slice(0,12); el.value=v.match(/.{1,2}/g)?.join(':')||v; }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  const deviceIcons = {
-    Router: '⬡', Switch: '⬢', Server: '▣', Workstation: '▪', Printer: '▫',
-    'IP Camera': '◉', 'Access Point': '◎', Firewall: '◈', NAS: '▦', 'VoIP Phone': '◇', Other: '◆'
-  };
+function getSeedData(){
+  return [
+    {id:uid(),ip:'192.168.1.1',device:'ROUTER-HQ-01',type:'Router',mac:'A4:C3:F0:12:34:56',branch:'HQ — Castries',user:'IT Dept',notes:'Main gateway',added:Date.now()},
+    {id:uid(),ip:'192.168.1.2',device:'SW-HQ-CORE',type:'Switch',mac:'B0:7D:64:AB:CD:EF',branch:'HQ — Castries',user:'IT Dept',notes:'Core layer-3 switch',added:Date.now()},
+    {id:uid(),ip:'192.168.1.10',device:'SRV-FILE-01',type:'Server',mac:'D4:3D:7E:A1:B2:C3',branch:'HQ — Castries',user:'',notes:'File server',added:Date.now()},
+    {id:uid(),ip:'192.168.1.50',device:'WS-ACCT-01',type:'Workstation',mac:'F8:1A:67:11:22:33',branch:'HQ — Castries',user:'Mary John',notes:'Accounts dept',added:Date.now()},
+    {id:uid(),ip:'192.168.2.1',device:'ROUTER-VF-01',type:'Router',mac:'C8:D7:19:44:55:66',branch:'Branch — Vieux Fort',user:'IT Dept',notes:'Site router',added:Date.now()},
+    {id:uid(),ip:'192.168.2.20',device:'CAM-VF-LOBBY',type:'IP Camera',mac:'00:1A:2B:3C:4D:5E',branch:'Branch — Vieux Fort',user:'Security',notes:'Lobby camera',added:Date.now()},
+    {id:uid(),ip:'192.168.3.1',device:'ROUTER-GS-01',type:'Router',mac:'E8:4E:06:77:88:99',branch:'Branch — Gros Islet',user:'IT Dept',notes:'Site router',added:Date.now()},
+    {id:uid(),ip:'192.168.3.5',device:'AP-GS-FLOOR1',type:'Access Point',mac:'70:3A:CB:AA:BB:CC',branch:'Branch — Gros Islet',user:'',notes:'Floor 1 Wi-Fi',added:Date.now()},
+  ];
+}
 
-  function renderTable() {
-    const q = document.getElementById('search-input').value.toLowerCase();
-    const filterBranch = document.getElementById('filter-branch').value;
-    const filterType = document.getElementById('filter-type').value;
-
-    let list = devices.filter(d => {
-      const match = [d.ip, d.device, d.mac, d.branch, d.type, d.user, d.notes].join(' ').toLowerCase().includes(q);
-      const branchOk = !filterBranch || d.branch === filterBranch;
-      const typeOk = !filterType || d.type === filterType;
-      return match && branchOk && typeOk;
-    });
-
-    list.sort((a, b) => {
-      let av = a[sortCol] || '', bv = b[sortCol] || '';
-      if (sortCol === 'ip') return sortDir * (ipToNum(av) - ipToNum(bv));
-      return sortDir * av.localeCompare(bv);
-    });
-
-    const tbody = document.getElementById('table-body');
-    if (list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7">
-        <div class="empty-state">
-          <div class="big">◈</div>
-          No devices found. Add one or adjust filters.
-        </div>
-      </td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = list.map(d => `
-      <tr>
-        <td class="ip-cell">${esc(d.ip)}</td>
-        <td>${esc(d.device)}</td>
-        <td><span class="device-type">${deviceIcons[d.type] || '◆'} ${esc(d.type)}</span></td>
-        <td class="mac-cell">${esc(d.mac)}</td>
-        <td><span class="branch-badge">⬡ ${esc(d.branch)}</span></td>
-        <td style="color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;">${esc(d.notes || (d.user ? 'User: ' + d.user : '—'))}</td>
-        <td class="actions">
-          <button class="btn-edit" onclick="openEdit('${d.id}')">EDIT</button>
-          <button class="btn-del" onclick="askDelete('${d.id}')">DEL</button>
-        </td>
-      </tr>
-    `).join('');
-
-    updateFilters();
-    updateStats();
-  }
-
-  function esc(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  function updateStats() {
-    document.getElementById('stat-total').textContent = devices.length;
-    document.getElementById('stat-branches').textContent = new Set(devices.map(d => d.branch)).size;
-    document.getElementById('stat-types').textContent = new Set(devices.map(d => d.type)).size;
-    if (!document.getElementById('stat-updated').textContent || document.getElementById('stat-updated').textContent === '—') {
-      document.getElementById('stat-updated').textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    }
-  }
-
-  function updateFilters() {
-    const branches = [...new Set(devices.map(d => d.branch))].sort();
-    const types = [...new Set(devices.map(d => d.type))].sort();
-    const fb = document.getElementById('filter-branch');
-    const ft = document.getElementById('filter-type');
-    const curB = fb.value, curT = ft.value;
-
-    fb.innerHTML = '<option value="">All Branches</option>' + branches.map(b => `<option${b===curB?' selected':''}>${b}</option>`).join('');
-    ft.innerHTML = '<option value="">All Device Types</option>' + types.map(t => `<option${t===curT?' selected':''}>${t}</option>`).join('');
-
-    const bl = document.getElementById('branch-list');
-    bl.innerHTML = branches.map(b => `<option value="${b}">`).join('');
-  }
-
-  // ── Modal ─────────────────────────────────────────────────────────────────
-  let editingId = null;
-
-  function openModal() {
-    editingId = null;
-    document.getElementById('modal-title').textContent = 'Add New Device';
-    document.getElementById('modal-sub').textContent = '// REGISTER A NEW NETWORK ASSET';
-    ['f-ip','f-device','f-type','f-mac','f-branch','f-user','f-notes'].forEach(id => {
-      const el = document.getElementById(id);
-      el.value = '';
-    });
-    document.getElementById('modal-error').style.display = 'none';
-    document.getElementById('modal').classList.add('open');
-    document.getElementById('f-ip').focus();
-  }
-
-  function openEdit(id) {
-    const d = devices.find(x => x.id === id);
-    if (!d) return;
-    editingId = id;
-    document.getElementById('modal-title').textContent = 'Edit Device';
-    document.getElementById('modal-sub').textContent = '// MODIFY NETWORK ASSET RECORD';
-    document.getElementById('f-ip').value = d.ip;
-    document.getElementById('f-device').value = d.device;
-    document.getElementById('f-type').value = d.type;
-    document.getElementById('f-mac').value = d.mac;
-    document.getElementById('f-branch').value = d.branch;
-    document.getElementById('f-user').value = d.user || '';
-    document.getElementById('f-notes').value = d.notes || '';
-    document.getElementById('modal-error').style.display = 'none';
-    document.getElementById('modal').classList.add('open');
-  }
-
-  function closeModal() { document.getElementById('modal').classList.remove('open'); }
-
-  function saveDevice() {
-    const ip     = document.getElementById('f-ip').value.trim();
-    const device = document.getElementById('f-device').value.trim();
-    const type   = document.getElementById('f-type').value;
-    const mac    = document.getElementById('f-mac').value.trim().toUpperCase();
-    const branch = document.getElementById('f-branch').value.trim();
-    const user   = document.getElementById('f-user').value.trim();
-    const notes  = document.getElementById('f-notes').value.trim();
-
-    // Validation
-    const ipRe = /^(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
-    const macRe = /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/;
-    const err = document.getElementById('modal-error');
-
-    if (!ip || !ipRe.test(ip)) { showErr(err, 'Enter a valid IP address (e.g. 192.168.1.100)'); return; }
-    if (!device) { showErr(err, 'Device name is required'); return; }
-    if (!type) { showErr(err, 'Select a device type'); return; }
-    if (!mac || !macRe.test(mac)) { showErr(err, 'Enter a valid MAC address (AA:BB:CC:DD:EE:FF)'); return; }
-    if (!branch) { showErr(err, 'Branch location is required'); return; }
-
-    // Check duplicate IP (excluding self when editing)
-    const dup = devices.find(d => d.ip === ip && d.id !== editingId);
-    if (dup) { showErr(err, `IP ${ip} is already assigned to ${dup.device}`); return; }
-
-    if (editingId) {
-      const idx = devices.findIndex(d => d.id === editingId);
-      devices[idx] = { ...devices[idx], ip, device, type, mac, branch, user, notes };
-      showToast('Device updated successfully');
-    } else {
-      devices.push({ id: uid(), ip, device, type, mac, branch, user, notes, added: Date.now() });
-      showToast('Device added to registry');
-    }
-
-    save();
-    renderTable();
-    closeModal();
-  }
-
-  function showErr(el, msg) {
-    el.textContent = '⚠ ' + msg;
-    el.style.display = 'block';
-  }
-
-  // ── Delete ────────────────────────────────────────────────────────────────
-  let deleteId = null;
-
-  function askDelete(id) {
-    deleteId = id;
-    const d = devices.find(x => x.id === id);
-    document.getElementById('confirm-msg').textContent = `Delete "${d.device}" (${d.ip})? This cannot be undone.`;
-    document.getElementById('confirm-overlay').classList.add('open');
-  }
-
-  function closeConfirm() {
-    deleteId = null;
-    document.getElementById('confirm-overlay').classList.remove('open');
-  }
-
-  function confirmDelete() {
-    devices = devices.filter(d => d.id !== deleteId);
-    save();
-    renderTable();
-    closeConfirm();
-    showToast('Device removed from registry', true);
-  }
-
-  // ── MAC formatter ─────────────────────────────────────────────────────────
-  function formatMac(el) {
-    let v = el.value.replace(/[^0-9a-fA-F]/g, '').toUpperCase().slice(0, 12);
-    el.value = v.match(/.{1,2}/g)?.join(':') || v;
-  }
-
-  // ── Toast ─────────────────────────────────────────────────────────────────
-  function showToast(msg, isErr = false) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = 'toast' + (isErr ? ' error' : '');
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2800);
-  }
-
-  // Init
-  updateStats();
-  renderTable();
+handleStartup();
 </script>
 </body>
 </html>
